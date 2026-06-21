@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Data sources for the Yield Curve Monitor.
+#
+# Primary source : U.S. Treasury "Daily Treasury Par Yield Curve Rates" (CSV).
+# Fallback source: FRED CSV download endpoint (no API key required).
+#
+# The system is designed to keep working when individual series are missing.
+# ---------------------------------------------------------------------------
+
+treasury:
+  enabled: true
+  years_back: 4          # how many calendar years of history to pull
+  timeout: 30
+  url_template: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv"
+
+fred:
+  enabled: true          # used as nominal fallback AND for breakevens / real yields
+  start_date: "2015-01-01"
+  timeout: 30
+  csv_template: "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}&cosd={start}"
+
+# Nominal par-yield maturities.
+#   key      -> internal label used everywhere in the app
+#   years    -> maturity in years (x-axis of the curve chart)
+#   treasury -> column name in the Treasury CSV (null if not provided)
+#   fred     -> FRED series id for the fallback (null if not on FRED)
+maturities:
+  - {key: "1M",  years: 0.0833, treasury: "1 Mo",  fred: "DGS1MO"}
+  - {key: "2M",  years: 0.1667, treasury: "2 Mo",  fred: null}
+  - {key: "3M",  years: 0.25,   treasury: "3 Mo",  fred: "DGS3MO"}
+  - {key: "4M",  years: 0.3333, treasury: "4 Mo",  fred: null}
+  - {key: "6M",  years: 0.5,    treasury: "6 Mo",  fred: "DGS6MO"}
+  - {key: "1Y",  years: 1.0,    treasury: "1 Yr",  fred: "DGS1"}
+  - {key: "2Y",  years: 2.0,    treasury: "2 Yr",  fred: "DGS2"}
+  - {key: "3Y",  years: 3.0,    treasury: "3 Yr",  fred: "DGS3"}
+  - {key: "5Y",  years: 5.0,    treasury: "5 Yr",  fred: "DGS5"}
+  - {key: "7Y",  years: 7.0,    treasury: "7 Yr",  fred: "DGS7"}
+  - {key: "10Y", years: 10.0,   treasury: "10 Yr", fred: "DGS10"}
+  - {key: "20Y", years: 20.0,   treasury: "20 Yr", fred: "DGS20"}
+  - {key: "30Y", years: 30.0,   treasury: "30 Yr", fred: "DGS30"}
+
+# Optional: inflation breakevens (FRED only). Missing -> rules marked "missing".
+breakevens:
+  - {key: "5Y_BE",   fred: "T5YIE"}
+  - {key: "10Y_BE",  fred: "T10YIE"}
+  - {key: "5Y5Y_BE", fred: "T5YIFR"}
+
+# Optional: TIPS real yields (FRED only).
+real_yields:
+  - {key: "5Y_REAL",  fred: "DFII5"}
+  - {key: "10Y_REAL", fred: "DFII10"}
+  - {key: "30Y_REAL", fred: "DFII30"}

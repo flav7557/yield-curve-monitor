@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Yield Curve Monitor &middot; 2026-06-19</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--card2:#1c2330;--bd:#2a313c;--tx:#e6edf3;
+--mut:#8b949e;--up:#f0635f;--down:#3fb950;--flat:#8b949e;--accent:#58a6ff;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+line-height:1.5;font-size:15px;}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px;}
+header.top{margin-bottom:22px;}
+.title{font-size:26px;font-weight:700;letter-spacing:-.01em;margin:0;}
+.subtitle{color:var(--mut);font-size:13.5px;margin-top:6px;}
+.subtitle b{color:var(--tx);font-weight:600;}
+.banner{background:#3d2c00;border:1px solid #8a6d1a;color:#f2d57e;padding:11px 14px;
+border-radius:10px;margin-bottom:18px;font-size:13.5px;}
+.warns{margin:0 0 18px;font-size:13px;color:var(--mut);}
+.warns summary{cursor:pointer;}
+.warns ul{margin:8px 0 0 18px;}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;
+padding:20px 22px;margin-bottom:18px;}
+.sec-title{margin:0 0 2px;font-size:17px;font-weight:650;}
+.sec-sub{margin:0 0 16px;color:var(--mut);font-size:13px;}
+/* exec */
+.exec-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;}
+.exec-eyebrow{text-transform:uppercase;letter-spacing:.08em;font-size:11.5px;color:var(--mut);}
+.exec-regime{margin:4px 0 0;font-size:25px;font-weight:720;letter-spacing:-.01em;}
+.exec-score{text-align:right;flex-shrink:0;}
+.score-num{font-size:40px;font-weight:760;line-height:1;}
+.score-num span{font-size:20px;color:var(--mut);margin-left:2px;}
+.score-pill{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;
+font-size:12px;font-weight:600;border:1px solid;}
+.exec-summary{margin:16px 0 18px;font-size:15px;color:#cdd6e0;}
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+.kpi{background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;}
+.kpi-val{font-size:16px;font-weight:660;font-variant-numeric:tabular-nums;}
+.kpi-lbl{font-size:11px;color:var(--mut);margin-top:3px;}
+/* regimes */
+.regime{border-bottom:1px solid var(--bd);}
+.regime:last-child{border-bottom:none;}
+.regime-bar{width:100%;background:none;border:none;color:var(--tx);cursor:pointer;
+display:grid;grid-template-columns:210px 1fr 52px 16px;align-items:center;gap:14px;
+padding:11px 2px;text-align:left;font-size:14px;}
+.regime-bar:hover{background:#1b2230;}
+.regime-name{font-weight:560;}
+.bar-wrap{background:#222a36;border-radius:6px;height:11px;overflow:hidden;}
+.bar-fill{display:block;height:100%;border-radius:6px;}
+.regime-score{text-align:right;font-variant-numeric:tabular-nums;font-weight:640;}
+.chev{transition:transform .15s ease;color:var(--mut);font-size:13px;}
+.chev.open{transform:rotate(90deg);}
+.regime-detail{display:none;padding:6px 4px 18px 4px;}
+.regime-detail.open{display:block;}
+.detail-def{font-size:13.5px;color:#c2ccd6;margin-bottom:14px;
+background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:11px 13px;}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle;}
+.cov{color:var(--mut);font-size:12px;margin-left:8px;}
+.rule-group{margin-bottom:12px;}
+.rule-group-h{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:0 0 7px;}
+.rule{border-left:3px solid var(--bd);background:var(--card2);border-radius:0 8px 8px 0;
+padding:8px 12px;margin-bottom:7px;}
+.rule.ok{border-left-color:var(--down);}
+.rule.no{border-left-color:#3a4350;}
+.rule.miss{border-left-color:#d29922;}
+.rule.contra{border-left-color:var(--up);}
+.rule-top{display:flex;justify-content:space-between;gap:10px;}
+.rule-name{font-size:13.5px;font-weight:550;}
+.rule-w{color:var(--mut);font-size:11.5px;flex-shrink:0;}
+.rule-meta{font-size:12px;color:var(--mut);margin-top:3px;font-variant-numeric:tabular-nums;}
+.rule-meta b{color:var(--tx);}
+.rule-exp{font-size:12.5px;color:#aeb8c4;margin-top:5px;}
+.rule-empty{font-size:13px;color:var(--mut);font-style:italic;}
+/* tables */
+.tbl-scroll{overflow-x:auto;}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px;}
+.tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap;}
+.tbl th{color:var(--mut);font-weight:560;font-size:12px;text-transform:uppercase;letter-spacing:.03em;}
+.tbl td.mat{font-weight:620;}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums;}
+.tbl .interp{color:var(--mut);font-size:12.5px;white-space:normal;min-width:240px;}
+.up{color:var(--up);}.down{color:var(--down);}.flat{color:var(--flat);}.muted{color:var(--mut);}
+/* chart */
+.chart{width:100%;height:380px;}
+/* segments */
+.seg-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.seg{background:var(--card2);border:1px solid var(--bd);border-radius:12px;padding:14px 15px;}
+.seg-h{font-weight:650;font-size:15px;}
+.seg-members{color:var(--mut);font-size:12px;margin:3px 0 12px;}
+.seg-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.seg-grid>div{display:flex;flex-direction:column;}
+.seg-grid span{font-size:15px;font-weight:640;font-variant-numeric:tabular-nums;}
+.seg-grid em{font-size:11px;color:var(--mut);font-style:normal;margin-top:1px;}
+.seg-interp{font-size:12.5px;color:#aeb8c4;margin-top:12px;}
+/* macro */
+.macro{margin:0;padding-left:20px;}
+.macro li{margin-bottom:9px;font-size:14px;color:#cdd6e0;}
+footer{color:var(--mut);font-size:12px;margin-top:26px;text-align:center;line-height:1.7;}
+footer .disc{color:#7d8590;max-width:680px;margin:0 auto;}
+@media(max-width:820px){
+ .kpi-row{grid-template-columns:repeat(3,1fr);}
+ .seg-row{grid-template-columns:1fr;}
+ .regime-bar{grid-template-columns:130px 1fr 44px 14px;gap:8px;font-size:13px;}
+ .exec-regime{font-size:21px;}
+}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1 class="title">Yield Curve Monitor</h1>
+  <div class="subtitle">Data as of <b>2026-06-19</b>
+   &nbsp;&middot;&nbsp; Generated 2026-06-21 21:15 UTC
+   &nbsp;&middot;&nbsp; Source: DEMO (synthetic)</div>
+</header>
+<div class="banner">&#9888; <strong>Demo / synthetic data.</strong> This page was generated from generated sample data (DEMO (synthetic)), not live market rates. Run with live network access for real Treasury / FRED data.</div>
+
+
+    <section class="card exec">
+      <div class="exec-head">
+        <div>
+          <div class="exec-eyebrow">Primary rates regime</div>
+          <h2 class="exec-regime">Bear Flattening / Fed Repricing</h2>
+        </div>
+        <div class="exec-score">
+          <div class="score-num">100<span>%</span></div>
+          <div class="score-pill" style="background:#30a46c1f;color:#30a46c;border-color:#30a46c55">High confidence</div>
+        </div>
+      </div>
+      <p class="exec-summary">Front-end yields rose more than long-end yields, suggesting hawkish Fed repricing and a flatter curve. On the day, the front-end moved +8.3 bps versus +1.3 bps at the long-end and the 2s10s spread flattened 7 bps on the day. The 2s10s curve is inverted at -10 bps and the inversion has been deepening over the past month.</p>
+      <div class="kpi-row"><div class="kpi"><div class="kpi-val">+5.7</div><div class="kpi-lbl">Curve shift (1D)</div></div><div class="kpi"><div class="kpi-val">+8.3</div><div class="kpi-lbl">Front-end (1D)</div></div><div class="kpi"><div class="kpi-val">+5.3</div><div class="kpi-lbl">Belly (1D)</div></div><div class="kpi"><div class="kpi-val">+1.3</div><div class="kpi-lbl">Long-end (1D)</div></div><div class="kpi"><div class="kpi-val">-10 bps</div><div class="kpi-lbl">2s10s</div></div><div class="kpi"><div class="kpi-val">-7.0</div><div class="kpi-lbl">2s10s &Delta;1D</div></div></div>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Regime scores</h3>
+      <p class="sec-sub">Click any regime to see which rules fired, which did not, and the contradictions.</p>
+      <div class="regimes">
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp0')" aria-expanded="false">
+            <span class="regime-name">Bear Flattening / Fed Repricing</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:100.0%;background:#e5484d"></span></span>
+            <span class="regime-score">100%</span>
+            <span class="chev" id="rp0-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp0">
+            <div class="detail-def"><span class="dot" style="background:#e5484d"></span>The curve flattens because short-term yields rise more than long-term yields. This usually means the market is pricing a more restrictive Fed, for longer, i.e. a hawkish repricing of monetary policy. <span class="cov">8/8 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (8)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2Y yield rose more than +5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">The 2Y is the most policy-sensitive point, so a strong rise confirms Fed repricing.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 5Y yield rose more than +4 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 4 4 bps</div><div class="rule-exp">The belly selling off alongside the front-end supports a hawkish move.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 10Y yield did not fall</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;ge; 0 0 bps</div><div class="rule-exp">If the long-end holds while the front rises, the curve flattens bearishly.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2s10s spread flattened (&lt; -3 bps)</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">The 10Y rose less than the 2Y, the defining feature of bear flattening.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Front-end outpaced long-end by &gt;3 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Front rising faster than the long-end is the core of the regime.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Overall curve shifted higher</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A bearish (higher-rates) backdrop is consistent with the move.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 1Y yield rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Money-market-sensitive points rising reinforces near-term policy repricing.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2Y move statistically significant (z &gt; 1.0)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.35</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 1.0 1.0</div><div class="rule-exp">A large z-score shows the front-end move is unusual, not noise.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp1')" aria-expanded="false">
+            <span class="regime-name">Deep Inversion / Late Cycle</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:70.0%;background:#f76808"></span></span>
+            <span class="regime-score">70%</span>
+            <span class="chev" id="rp1-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp1">
+            <div class="detail-def"><span class="dot" style="background:#f76808"></span>The curve is strongly inverted, with short rates well above long rates, a classic late-cycle signature of tight monetary policy. <span class="cov">6/6 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (4)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2s10s is inverted (&lt; 0)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-9.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">A negative 2s10s is the baseline definition of inversion.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 3m10y is inverted (&lt; 0)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-82.1 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">The 3m10y is the Fed's preferred recession gauge.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 3m10y deeply inverted (&lt; -75 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-82.1 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -75 -75 bps</div><div class="rule-exp">A deeply negative 3m10y is a strong late-cycle signal.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Inversion persisted over recent days</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>yes (recent)</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0.5 0.5</div><div class="rule-exp">A persistent, not one-day, inversion is what matters for the cycle.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (2)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s deeply inverted (&lt; -50 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-9.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -50 -50 bps</div><div class="rule-exp">A large negative 2s10s marks a genuinely deep inversion.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s30s inverted (&lt; 0)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.2 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">Even the long end below the front-end shows broad inversion.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp2')" aria-expanded="false">
+            <span class="regime-name">Rates Shock / Higher-for-Longer</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:66.7%;background:#f76808"></span></span>
+            <span class="regime-score">67%</span>
+            <span class="chev" id="rp2-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp2">
+            <div class="detail-def"><span class="dot" style="background:#f76808"></span>Rates jump sharply, especially in policy-sensitive maturities, consistent with the market pricing a more restrictive or more durably restrictive monetary policy. <span class="cov">8/8 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (5)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2Y yield rose more than +7 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 7 7 bps</div><div class="rule-exp">A large front-end jump is the signature of a rates shock.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Average curve shift &gt; +5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">A strong broad rise distinguishes a shock from a normal day.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2Y move very significant (z &gt; 1.5)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.35</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 1.5 1.5</div><div class="rule-exp">A high z-score marks a genuinely unusual repricing.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2s10s flattened or held</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;le; 0 0 bps</div><div class="rule-exp">Front-led shocks tend to flatten or hold an inverted curve.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Front-end average &gt; +5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+8.3 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">A strong front segment confirms policy-driven pressure.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (3)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5Y yield rose more than +7 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 7 7 bps</div><div class="rule-exp">A sharp belly move shows the shock spans policy-sensitive tenors.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y yield rose more than +5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">The 10Y joining confirms broad upward pressure.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5Y move very significant (z &gt; 1.5)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+1.18</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 1.5 1.5</div><div class="rule-exp">Confirms the belly move is extreme.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp3')" aria-expanded="false">
+            <span class="regime-name">Disinversion / Normalization</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:58.9%;background:#1fb8b0"></span></span>
+            <span class="regime-score">59%</span>
+            <span class="chev" id="rp3-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp3">
+            <div class="detail-def"><span class="dot" style="background:#1fb8b0"></span>The curve becomes less inverted, via a falling front-end, a rising long-end, or both, moving back towards a normal upward slope. <span class="cov">5/5 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (3)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2s10s steeper over 5 days</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.4 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A multi-day steepening trend is the essence of disinversion.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 3m10y steeper over 20 days</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+6.1 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">The 3m10y normalising supports the disinversion read.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Curve was inverted recently</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>yes (recent)</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0.5 0.5</div><div class="rule-exp">Disinversion only matters if the curve was inverted to begin with.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (2)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s steeper over 20 days</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-28.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A 20-day steepening confirms a normalisation trend.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s steepened today</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Today's steepening adds to the normalisation.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (1)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 2s10s sharply flatter over 20 days (&lt; -10 bps)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>-28.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -10 -10 bps</div><div class="rule-exp">A worsening inversion is the opposite of the regime.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp4')" aria-expanded="false">
+            <span class="regime-name">Parallel Bear Shift / Broad Rates Selloff</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:40.0%;background:#e5484d"></span></span>
+            <span class="regime-score">40%</span>
+            <span class="chev" id="rp4-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp4">
+            <div class="detail-def"><span class="dot" style="background:#e5484d"></span>The entire curve moves higher in a roughly parallel fashion, indicating broad upward pressure on rates rather than a slope story. <span class="cov">8/8 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (5)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Average curve shift &gt; +4 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 4 4 bps</div><div class="rule-exp">A sizeable broad rise is the headline of a parallel bear shift.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2Y rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">The front-end participating keeps the move broad.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 5Y rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Belly participation supports a parallel move.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 10Y rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">The long-end participating keeps the move broad.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 30Y rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+1.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Long-bond participation supports a parallel move.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (3)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Front vs long gap small (|.| &lt; 3 bps)</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 3 3 bps</div><div class="rule-exp">A small front-vs-long gap is what makes the shift parallel.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s barely moved (|.| &lt; 3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 3 3 bps</div><div class="rule-exp">Little slope change confirms a level (not slope) move.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5s30s barely moved (|.| &lt; 3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 3 3 bps</div><div class="rule-exp">A stable long-end slope reinforces parallelism.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (1)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Front and long diverged strongly (|.| &gt; 6 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;gt; 6 6 bps</div><div class="rule-exp">A large slope move means the shift was not parallel.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp5')" aria-expanded="false">
+            <span class="regime-name">Bull Flattening / Long-End Rally</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:34.7%;background:#30a46c"></span></span>
+            <span class="regime-score">35%</span>
+            <span class="chev" id="rp5-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp5">
+            <div class="detail-def"><span class="dot" style="background:#30a46c"></span>The curve flattens because long-term yields fall more than short-term yields. Can signal strong duration demand, lower long-run growth / inflation expectations, or a flight-to-quality bid. <span class="cov">8/8 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (3)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 2s10s spread flattened (&lt; -3 bps)</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">A flatter 2s10s driven by the long-end is the defining feature.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 5s30s spread flattened (&lt; -3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Flattening at the very long end confirms long-end leadership.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Long-end fell more than front-end by &gt;3 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Long falling faster than the front-end is the core asymmetry.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (5)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y yield fell more than -5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -5 -5 bps</div><div class="rule-exp">A strong 10Y rally is the engine of bull flattening.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y yield fell more than -5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+1.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -5 -5 bps</div><div class="rule-exp">The long bond rallying points to duration demand.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Overall curve rallied lower</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">A lower-rates backdrop is consistent with the move.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y move significant (z &lt; -1.0)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+0.49</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -1.0 -1.0</div><div class="rule-exp">A large negative z-score shows the long-end rally is unusual.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y move significant (z &lt; -1.0)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+0.36</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -1.0 -1.0</div><div class="rule-exp">Confirms the long bond rally is meaningful.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (2)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 10Y yield rose</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A rising long-end contradicts a bullish flattening.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Whole curve sold off</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 2 2 bps</div><div class="rule-exp">A broad sell-off is inconsistent with a bullish move.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp6')" aria-expanded="false">
+            <span class="regime-name">Inflation Repricing</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:12.0%;background:#a371f7"></span></span>
+            <span class="regime-score">12%</span>
+            <span class="chev" id="rp6-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp6">
+            <div class="detail-def"><span class="dot" style="background:#a371f7"></span>The move looks driven by a revision in inflation expectations. Nominal yields rise and, where available, breakeven inflation rises with them. <span class="cov">7/7 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (4)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 10Y nominal yield rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Higher nominal long yields are a precondition for the regime.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; 30Y nominal yield rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+1.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Long-end participation supports an inflation story.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Long-end average rose</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+1.3 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">The long segment moving up is consistent with inflation risk.</div></div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Overall curve shifted higher</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A higher-rates backdrop is consistent with the move.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (3)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y breakeven inflation rose</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-0.1 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Rising 10Y breakevens are the cleanest sign of inflation repricing.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5Y breakeven inflation rose</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-0.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Front breakevens rising confirm a near-term inflation impulse.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5s30s steepened</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Long-end steepening often accompanies an inflation scare.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (2)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 10Y breakeven fell</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-0.1 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">Falling breakevens mean the move is real-rate, not inflation, driven.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 5Y breakeven fell</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>-0.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">Falling front breakevens weaken the inflation read.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp7')" aria-expanded="false">
+            <span class="regime-name">Neutral / Mixed</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:8.0%;background:#8b949e"></span></span>
+            <span class="regime-score">8%</span>
+            <span class="chev" id="rp7-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp7">
+            <div class="detail-def"><span class="dot" style="background:#8b949e"></span>No curve regime clearly dominates. Either the signals contradict each other, the moves are too small to be meaningful, or too much data is missing to be confident. </div>
+            <div class="rule-empty">This regime is scored as the complement of the strongest regime.</div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp8')" aria-expanded="false">
+            <span class="regime-name">Bear Steepening / Term Premium Shock</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:2.0%;background:#e5484d"></span></span>
+            <span class="regime-score">0%</span>
+            <span class="chev" id="rp8-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp8">
+            <div class="detail-def"><span class="dot" style="background:#e5484d"></span>The curve steepens because long-term yields rise more than short-term yields. Often driven by rising term premium, debt-supply fears, a long-run inflation scare, or a duration sell-off. <span class="cov">9/9 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (1)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Overall curve shifted higher</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A bearish backdrop is consistent with the move.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (8)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y yield rose more than +5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">The 10Y leading higher is the engine of a bear steepening.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y yield rose more than +5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+1.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">The long bond selling off points to duration / term-premium pressure.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y rose more than 2Y by &gt;3 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-8.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">The 2s30s steepening confirms the long-end is leading.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s spread steepened (&gt; +3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">A steeper 2s10s is the defining feature of the regime.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5s30s spread steepened (&gt; +3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Steepening at the very long end is classic term-premium behaviour.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Long-end outpaced front-end by &gt;3 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Long &gt; front is the core asymmetry of bear steepening.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y move significant (z &gt; 1.0)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+0.49</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 1.0 1.0</div><div class="rule-exp">A large z-score shows the long-end move is unusual.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y move significant (z &gt; 1.0)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+0.36</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 1.0 1.0</div><div class="rule-exp">Confirms the long bond move is meaningful.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (2)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 2Y rose more than 30Y</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-8.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">If the front-end leads, the move is flattening, not steepening.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 5s30s flattened</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Long-end flattening contradicts term-premium steepening.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp9')" aria-expanded="false">
+            <span class="regime-name">Bull Steepening / Recession Pricing</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:2.0%;background:#30a46c"></span></span>
+            <span class="regime-score">0%</span>
+            <span class="chev" id="rp9-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp9">
+            <div class="detail-def"><span class="dot" style="background:#30a46c"></span>The curve steepens because short-term yields fall more than long-term yields. Typically the market is pricing future rate cuts or an economic slowdown. <span class="cov">7/7 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Not triggered (7)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2Y yield fell more than -5 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -5 -5 bps</div><div class="rule-exp">A sharp front-end rally is how the market prices easier policy.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5Y yield fell more than -4 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -4 -4 bps</div><div class="rule-exp">The belly rallying with the front-end supports the dovish read.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y yield did not rise</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;le; 0 0 bps</div><div class="rule-exp">The long-end holding or falling less keeps the move a steepening.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s spread steepened (&gt; +3 bps)</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">A steeper 2s10s driven by the front-end is the defining feature.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Front-end fell more than long-end by &gt;3 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Front falling faster than the long-end is the core asymmetry.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Overall curve rallied lower</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">A lower-rates backdrop is consistent with easing expectations.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2Y move significant (z &lt; -1.0)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.35</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -1.0 -1.0</div><div class="rule-exp">A large negative z-score shows the front-end rally is unusual.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (4)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 2Y yield rose</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A rising front-end contradicts a bullish steepening.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 2s10s spread flattened</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Flattening is the opposite of this regime.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Whole curve sold off</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 2 2 bps</div><div class="rule-exp">A broad sell-off is inconsistent with a bullish move.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Front-end rose more than long-end</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Front leading higher would be bear flattening, not bull steepening.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp10')" aria-expanded="false">
+            <span class="regime-name">Parallel Bull Shift / Broad Duration Rally</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:2.0%;background:#30a46c"></span></span>
+            <span class="regime-score">0%</span>
+            <span class="chev" id="rp10-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp10">
+            <div class="detail-def"><span class="dot" style="background:#30a46c"></span>The entire curve moves lower in a roughly parallel fashion, indicating broad demand for duration or a broad fall in rate expectations. <span class="cov">8/8 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Not triggered (8)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Average curve shift &lt; -4 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -4 -4 bps</div><div class="rule-exp">A sizeable broad fall is the headline of a parallel bull shift.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2Y fell</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">The front-end participating keeps the move broad.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5Y fell</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">Belly participation supports a parallel move.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y fell</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">The long-end participating keeps the move broad.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y fell</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+1.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">Long-bond participation supports a parallel move.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Front vs long gap small (|.| &lt; 3 bps)</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 3 3 bps</div><div class="rule-exp">A small front-vs-long gap is what makes the shift parallel.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s barely moved (|.| &lt; 3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 3 3 bps</div><div class="rule-exp">Little slope change confirms a level (not slope) move.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5s30s barely moved (|.| &lt; 3 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 3 3 bps</div><div class="rule-exp">A stable long-end slope reinforces parallelism.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (2)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Front and long diverged strongly (|.| &gt; 6 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;gt; 6 6 bps</div><div class="rule-exp">A large slope move means the shift was not parallel.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Average curve shift was positive</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A rising curve contradicts a bullish shift.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp11')" aria-expanded="false">
+            <span class="regime-name">Recession Scare / Policy Easing Pricing</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:2.0%;background:#30a46c"></span></span>
+            <span class="regime-score">0%</span>
+            <span class="chev" id="rp11-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp11">
+            <div class="detail-def"><span class="dot" style="background:#30a46c"></span>The market prices a slowdown or future rate cuts. Short and intermediate yields fall sharply, usually with a steepening curve. <span class="cov">7/7 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Not triggered (7)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2Y yield fell more than -7 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -7 -7 bps</div><div class="rule-exp">A large front-end rally is how a growth scare is priced.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5Y yield fell more than -6 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -6 -6 bps</div><div class="rule-exp">The belly leading lower reinforces the easing read.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y yield fell</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">The long-end joining the rally supports risk-off pricing.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Average curve shift &lt; -4 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -4 -4 bps</div><div class="rule-exp">A strong broad rally distinguishes a scare from a quiet day.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2s10s steepened</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Bull steepening is the typical shape of easing expectations.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Front-end fell more than long-end</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Front leadership confirms the cut-pricing dynamic.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2Y move very significant (z &lt; -1.5)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.35</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -1.5 -1.5</div><div class="rule-exp">A high negative z-score marks a genuinely unusual rally.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (3)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 2Y yield rose</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A rising front-end contradicts easing expectations.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 5Y yield rose</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A belly sell-off contradicts the regime.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Average curve shift positive</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 2 2 bps</div><div class="rule-exp">A rising curve is inconsistent with a recession scare.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp12')" aria-expanded="false">
+            <span class="regime-name">Term Premium Shock</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:2.0%;background:#a371f7"></span></span>
+            <span class="regime-score">0%</span>
+            <span class="chev" id="rp12-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp12">
+            <div class="detail-def"><span class="dot" style="background:#a371f7"></span>The long-end rises disproportionately, often without a matching front-end move. Can signal higher term premium, fiscal uncertainty, or greater demand for compensation to hold long duration. <span class="cov">7/7 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Triggered rules (1)</div><div class="rule ok"><div class="rule-top"><span class="rule-name">&#9989; Overall curve shifted higher</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+5.7 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">A bearish backdrop is consistent with the move.</div></div></div><div class="rule-group"><div class="rule-group-h">Not triggered (6)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y rose more than 2Y by &gt;5 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-8.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 5 5 bps</div><div class="rule-exp">A large 2s30s steepening is the signature of a term-premium shock.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y rose more than 2Y by &gt;3 bps</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-7.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Steepening from the long-end up confirms duration pressure.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5s30s steepened</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">Steepening at the very long end is characteristic.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10s30s steepened</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-1.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 0 0 bps</div><div class="rule-exp">The 30Y leading the 10Y points to specific long-bond pressure.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Long-end outpaced front-end by &gt;4 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 4 4 bps</div><div class="rule-exp">Strong long-over-front asymmetry is the core of the regime.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y move significant (z &gt; 1.0)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+0.36</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 1.0 1.0</div><div class="rule-exp">A high z-score shows the long-bond move is unusual.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (2)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Front-end rose more than long-end</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 3 3 bps</div><div class="rule-exp">Front leadership would be Fed repricing, not a term-premium shock.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 5s30s flattened</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; -3 -3 bps</div><div class="rule-exp">Long-end flattening is inconsistent with term-premium pressure.</div></div></div>
+          </div>
+        </div>
+        
+        <div class="regime">
+          <button class="regime-bar" onclick="toggleDetail('rp13')" aria-expanded="false">
+            <span class="regime-name">Front-End Anchored / Long-End Moving</span>
+            <span class="bar-wrap"><span class="bar-fill" style="width:2.0%;background:#a371f7"></span></span>
+            <span class="regime-score">0%</span>
+            <span class="chev" id="rp13-chev">&#9656;</span>
+          </button>
+          <div class="regime-detail" id="rp13">
+            <div class="detail-def"><span class="dot" style="background:#a371f7"></span>The front-end is stable while the long-end moves materially. Near-term policy expectations are steady, but growth, inflation, or term-premium views are changing. <span class="cov">6/6 rules had data</span></div>
+            <div class="rule-group"><div class="rule-group-h">Not triggered (6)</div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 2Y barely moved (|.| &lt; 2 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 2 2 bps</div><div class="rule-exp">A still 2Y is the defining feature of an anchored front-end.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 1Y barely moved (|.| &lt; 2 bps)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;lt; 2 2 bps</div><div class="rule-exp">A stable 1Y reinforces that near-term policy views are steady.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 10Y moved materially (|.| &gt; 5 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+2.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;gt; 5 5 bps</div><div class="rule-exp">A meaningful 10Y move is what makes the regime interesting.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 30Y moved materially (|.| &gt; 5 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+1.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;gt; 5 5 bps</div><div class="rule-exp">Long-bond movement confirms the action is at the long-end.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; Long-end moved more than front-end by &gt;4 bps</span><span class="rule-w">w3</span></div><div class="rule-meta">Observed <b>-6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;gt; 4 4 bps</div><div class="rule-exp">The size asymmetry between long and front is the core signal.</div></div><div class="rule no"><div class="rule-top"><span class="rule-name">&#10060; 5s30s changed materially (|.| &gt; 5 bps)</span><span class="rule-w">w1</span></div><div class="rule-meta">Observed <b>-4.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;gt; 5 5 bps</div><div class="rule-exp">A moving long-end slope shows the long sector is repricing.</div></div></div><div class="rule-group"><div class="rule-group-h">Contradictions (2)</div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; 2Y moved strongly (|.| &gt; 5 bps)</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>+9.0 bps</b> &nbsp;&middot;&nbsp; Condition |x| &amp;gt; 5 5 bps</div><div class="rule-exp">A large front-end move means it is not anchored.</div></div><div class="rule contra"><div class="rule-top"><span class="rule-name">&#128317; Front-end moved as much as long-end</span><span class="rule-w">w2</span></div><div class="rule-meta">Observed <b>-6.9 bps</b> &nbsp;&middot;&nbsp; Condition &amp;lt; 0 0 bps</div><div class="rule-exp">If the front moves as much as the long-end, the regime fails.</div></div></div>
+          </div>
+        </div>
+        </div>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Yield curve table</h3>
+      <div class="tbl-scroll"><table class="tbl">
+        <thead><tr><th>Maturity</th><th class="num">Yield</th><th class="num">1D bps</th>
+        <th class="num">5D bps</th><th class="num">20D bps</th><th class="num">Z (1D)</th></tr></thead>
+        <tbody><tr><td class="mat">1M</td><td class="num">5.33%</td><td class="num up">+6.0</td><td class="num up">+2.8</td><td class="num up">+1.8</td><td class="num up">+1.60</td></tr><tr><td class="mat">2M</td><td class="num">5.29%</td><td class="num up">+7.0</td><td class="num up">+2.8</td><td class="num up">+23.9</td><td class="num up">+1.64</td></tr><tr><td class="mat">3M</td><td class="num">5.30%</td><td class="num up">+7.0</td><td class="num up">+9.4</td><td class="num down">-5.0</td><td class="num up">+1.97</td></tr><tr><td class="mat">4M</td><td class="num">5.21%</td><td class="num up">+8.0</td><td class="num down">-0.3</td><td class="num up">+13.4</td><td class="num up">+2.05</td></tr><tr><td class="mat">6M</td><td class="num">5.11%</td><td class="num up">+8.0</td><td class="num up">+15.7</td><td class="num up">+1.3</td><td class="num up">+2.32</td></tr><tr><td class="mat">1Y</td><td class="num">4.95%</td><td class="num up">+9.0</td><td class="num up">+21.6</td><td class="num up">+2.4</td><td class="num up">+2.13</td></tr><tr><td class="mat">2Y</td><td class="num">4.58%</td><td class="num up">+9.0</td><td class="num up">+12.2</td><td class="num up">+30.1</td><td class="num up">+2.35</td></tr><tr><td class="mat">3Y</td><td class="num">4.52%</td><td class="num up">+7.0</td><td class="num up">+14.3</td><td class="num up">+19.0</td><td class="num up">+1.92</td></tr><tr><td class="mat">5Y</td><td class="num">4.32%</td><td class="num up">+5.0</td><td class="num up">+5.4</td><td class="num up">+11.4</td><td class="num up">+1.18</td></tr><tr><td class="mat">7Y</td><td class="num">4.41%</td><td class="num up">+4.0</td><td class="num up">+2.0</td><td class="num down">-6.9</td><td class="num up">+1.07</td></tr><tr><td class="mat">10Y</td><td class="num">4.48%</td><td class="num up">+2.0</td><td class="num up">+14.6</td><td class="num up">+1.2</td><td class="num up">+0.49</td></tr><tr><td class="mat">20Y</td><td class="num">4.82%</td><td class="num up">+1.0</td><td class="num down">-1.7</td><td class="num up">+4.7</td><td class="num up">+0.20</td></tr><tr><td class="mat">30Y</td><td class="num">4.60%</td><td class="num up">+1.0</td><td class="num up">+10.1</td><td class="num up">+15.7</td><td class="num up">+0.36</td></tr></tbody>
+      </table></div>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Curve spreads</h3>
+      <div class="tbl-scroll"><table class="tbl">
+        <thead><tr><th>Spread</th><th class="num">Level</th><th class="num">1D</th>
+        <th class="num">5D</th><th class="num">20D</th><th>Interpretation</th></tr></thead>
+        <tbody><tr><td class="mat">2s10s</td><td class="num">-10 bps</td><td class="num down">-7.0</td><td class="num up">+2.4</td><td class="num down">-28.9</td><td class="interp">The 2s10s spread is inverted at -10 bps and flattened on the day.</td></tr><tr><td class="mat">5s30s</td><td class="num">+28 bps</td><td class="num down">-4.0</td><td class="num up">+4.7</td><td class="num up">+4.4</td><td class="interp">The 5s30s spread is positive at +28 bps and flattened on the day.</td></tr><tr><td class="mat">3m10y</td><td class="num">-82 bps</td><td class="num down">-5.0</td><td class="num up">+5.2</td><td class="num up">+6.1</td><td class="interp">The 3m10y spread is inverted at -82 bps and flattened on the day.</td></tr><tr><td class="mat">2s5s</td><td class="num">-26 bps</td><td class="num down">-4.0</td><td class="num down">-6.8</td><td class="num down">-18.7</td><td class="interp">The 2s5s spread is inverted at -26 bps and flattened on the day.</td></tr><tr><td class="mat">10s30s</td><td class="num">+12 bps</td><td class="num down">-1.0</td><td class="num down">-4.5</td><td class="num up">+14.6</td><td class="interp">The 10s30s spread is positive at +12 bps and was little changed.</td></tr><tr><td class="mat">1y10y</td><td class="num">-46 bps</td><td class="num down">-7.0</td><td class="num down">-7.0</td><td class="num down">-1.2</td><td class="interp">The 1y10y spread is inverted at -46 bps and flattened on the day.</td></tr></tbody>
+      </table></div>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Curve chart</h3>
+      <p class="sec-sub">Par yields today versus 1, 5 and 20 business days ago.</p>
+      <div id="curveChart" class="chart"></div>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Segment analysis</h3>
+      <div class="seg-row">
+        <div class="seg">
+          <div class="seg-h">Front-end</div>
+          <div class="seg-members">3M, 6M, 1Y, 2Y</div>
+          <div class="seg-grid">
+            <div><span class="up">+8.3</span><em>1D</em></div>
+            <div><span class="up">+14.7</span><em>5D</em></div>
+            <div><span class="up">+7.2</span><em>20D</em></div>
+            <div><span>+145%</span><em>contribution</em></div>
+          </div>
+          <div class="seg-interp">Front-end rose by 8.3 bps on average.</div>
+        </div>
+        
+        <div class="seg">
+          <div class="seg-h">Belly</div>
+          <div class="seg-members">3Y, 5Y, 7Y</div>
+          <div class="seg-grid">
+            <div><span class="up">+5.3</span><em>1D</em></div>
+            <div><span class="up">+7.2</span><em>5D</em></div>
+            <div><span class="up">+7.8</span><em>20D</em></div>
+            <div><span>+94%</span><em>contribution</em></div>
+          </div>
+          <div class="seg-interp">Belly rose by 5.3 bps on average.</div>
+        </div>
+        
+        <div class="seg">
+          <div class="seg-h">Long-end</div>
+          <div class="seg-members">10Y, 20Y, 30Y</div>
+          <div class="seg-grid">
+            <div><span class="up">+1.3</span><em>1D</em></div>
+            <div><span class="up">+7.7</span><em>5D</em></div>
+            <div><span class="up">+7.2</span><em>20D</em></div>
+            <div><span>+23%</span><em>contribution</em></div>
+          </div>
+          <div class="seg-interp">Long-end rose by 1.3 bps on average.</div>
+        </div>
+        </div>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Macro interpretation</h3>
+      <ul class="macro"><li>The policy-sensitive 2Y rose meaningfully, consistent with the market pricing a more restrictive Fed path (higher-for-longer).</li><li>Breakeven inflation fell, so any rise in nominal yields is more a real-rate story than an inflation one.</li><li>The curve flattened on the day (2s10s narrower).</li><li>Across maturities the curve shifted higher, a broad rates sell-off.</li><li>The 2s10s curve is inverted at -10 bps and the inversion has been deepening over the past month.</li></ul>
+    </section>
+    
+    <section class="card">
+      <h3 class="sec-title">Historical context</h3>
+      <p class="sec-sub">Last 1 saved observations.</p>
+      <div class="tbl-scroll"><table class="tbl">
+        <thead><tr><th>Date</th><th>Primary regime</th><th class="num">Conf.</th>
+        <th class="num">2s10s</th><th class="num">5s30s</th><th class="num">10Y</th>
+        <th class="num">Front 1D</th><th class="num">Long 1D</th></tr></thead>
+        <tbody><tr><td>2026-06-19</td><td>Bear Flattening / Fed Repricing</td><td class="num">100%</td><td class="num">-10 bps</td><td class="num">+28 bps</td><td class="num">4.48%</td><td class="num up">+8.3</td><td class="num up">+1.3</td></tr></tbody>
+      </table></div>
+    </section>
+    
+<footer>
+  <div class="disc">Rule-based, interpretable classification of U.S. Treasury par-yield curve
+  moves. Methodology is heuristic and meant as an analytical aid, not a forecast.
+  <strong>This is not investment advice.</strong></div>
+</footer>
+</div>
+<script>
+function toggleDetail(id){
+  var p=document.getElementById(id);
+  var c=document.getElementById(id+'-chev');
+  var open=p.classList.toggle('open');
+  if(c)c.classList.toggle('open',open);
+  var btn=p.previousElementSibling;
+  if(btn)btn.setAttribute('aria-expanded',open?'true':'false');
+}
+(function(){
+  var data={"labels": ["1M", "2M", "3M", "4M", "6M", "1Y", "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y"], "years": [0.0833, 0.1667, 0.25, 0.3333, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0], "series": {"today": {"date": "2026-06-19", "values": [5.3317341909327745, 5.293582886198873, 5.3038509232264035, 5.21267093307385, 5.112903768573789, 4.945316128638952, 4.58031778416143, 4.521139785913315, 4.321844834127162, 4.407202375402405, 4.483112751850092, 4.8233002969130805, 4.601881751619448]}, "d1": {"date": "2026-06-18", "values": [5.271734190932775, 5.223582886198873, 5.233850923226403, 5.13267093307385, 5.032903768573789, 4.855316128638952, 4.49031778416143, 4.451139785913314, 4.271844834127162, 4.367202375402405, 4.463112751850092, 4.813300296913081, 4.591881751619448]}, "d5": {"date": "2026-06-12", "values": [5.303247466989812, 5.26525995696473, 5.209978920730566, 5.215643813135737, 4.955710993169381, 4.728977247585273, 4.458714905323349, 4.378581077712797, 4.268204551526944, 4.386761053523428, 4.337055200511575, 4.839800736508405, 4.500757629808054]}, "d20": {"date": "2026-05-22", "values": [5.313326082209742, 5.054342597902707, 5.353466876612251, 5.078340587993188, 5.0995984747435985, 4.921470932960785, 4.2797695621146845, 4.331167951961885, 4.208333390459817, 4.476503250353739, 4.471606895675096, 4.776683609252616, 4.44453876146707]}}};
+  var el=document.getElementById('curveChart');
+  if(!el||!window.Plotly||!data||!data.labels){if(el)el.innerHTML='<div style="color:#8b949e;font-size:13px">Chart unavailable.</div>';return;}
+  var defs=[['today','Today','#58a6ff',3],['d1','1D ago','#a371f7',1.5],
+            ['d5','5D ago','#d29922',1.5],['d20','20D ago','#8b949e',1.5]];
+  var traces=[];
+  defs.forEach(function(d){
+    var s=data.series[d[0]];
+    if(!s||!s.values)return;
+    traces.push({x:data.labels,y:s.values,mode:'lines+markers',name:d[1]+(s.date?' ('+s.date+')':''),
+      line:{color:d[2],width:d[3]},marker:{size:5},connectgaps:true});
+  });
+  var layout={paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
+    font:{color:'#e6edf3',size:12},margin:{l:48,r:16,t:10,b:40},
+    xaxis:{type:'category',gridcolor:'#222a36',title:{text:'Maturity'}},
+    yaxis:{gridcolor:'#222a36',ticksuffix:'%',title:{text:'Yield'}},
+    legend:{orientation:'h',y:-0.2},hovermode:'x unified'};
+  Plotly.newPlot(el,traces,layout,{displayModeBar:false,responsive:true});
+})();
+</script>
+</body></html>

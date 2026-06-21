@@ -1,0 +1,490 @@
+# ===========================================================================
+# Yield-curve regime rule book.
+#
+# Every regime has confirming rules and contradiction rules. Each rule is:
+#   name        -> human label shown in the report
+#   metric      -> key from the computed metric namespace (see curve_features.py)
+#   op          -> one of: >  >=  <  <=  abs>  abs>=  abs<  abs<=  between
+#   threshold   -> number (or [low, high] for "between"), in basis points / bps-spreads
+#   weight      -> 1..3, importance of the rule
+#   explanation -> why this rule matters
+#
+# Score = (confirming weight obtained) net of contradictions, normalised by the
+# confirming weight that had data, then dampened by data coverage.
+#
+# Metric namespace cheat-sheet:
+#   {M}.level / .chg_1d / .chg_5d / .chg_20d / .chg_60d / .z_1d / .z_5d
+#     M in 1M 2M 3M 4M 6M 1Y 2Y 3Y 5Y 7Y 10Y 20Y 30Y     (changes in bps)
+#   spread.{S}.level / .chg_1d / .chg_5d / .chg_20d / .z_1d / .recently_inverted
+#     S in 2s10s 5s30s 3m10y 2s5s 10s30s 1y10y 2s30s      (bps)
+#   seg.{front|belly|long}.chg_1d / .chg_5d / .chg_20d     (bps)
+#   curve.shift_1d / .front_vs_long_1d / .long_vs_front_1d /
+#         .belly_vs_wings_1d / .long_vs_front_abs_1d        (bps)
+#   be.{5y|10y|5y5y}.chg_1d / .level   real.{5y|10y|30y}.chg_1d / .level
+# ===========================================================================
+
+meta:
+  primary_min_confidence: 60   # >= this and a clear gap -> a confident primary regime
+  flag_min_confidence: 55      # >= this -> primary but flagged "tentative"
+  gap_threshold: 5             # min points over the runner-up to be "clear"
+  contradiction_weight: 0.7    # how strongly a triggered contradiction subtracts
+  coverage_floor: 0.5          # min multiplier when most rules lack data
+
+regimes:
+
+  # -------------------------------------------------------------------------
+  - id: bear_flattening
+    name: "Bear Flattening / Fed Repricing"
+    category: bear
+    definition: >
+      The curve flattens because short-term yields rise more than long-term
+      yields. This usually means the market is pricing a more restrictive Fed,
+      for longer, i.e. a hawkish repricing of monetary policy.
+    interpretation: >
+      Front-end yields rose more than long-end yields, suggesting hawkish Fed
+      repricing and a flatter curve.
+    confirming:
+      - {name: "2Y yield rose more than +5 bps", metric: "2Y.chg_1d", op: ">", threshold: 5, weight: 2,
+         explanation: "The 2Y is the most policy-sensitive point, so a strong rise confirms Fed repricing."}
+      - {name: "5Y yield rose more than +4 bps", metric: "5Y.chg_1d", op: ">", threshold: 4, weight: 2,
+         explanation: "The belly selling off alongside the front-end supports a hawkish move."}
+      - {name: "10Y yield did not fall", metric: "10Y.chg_1d", op: ">=", threshold: 0, weight: 1,
+         explanation: "If the long-end holds while the front rises, the curve flattens bearishly."}
+      - {name: "2s10s spread flattened (< -3 bps)", metric: "spread.2s10s.chg_1d", op: "<", threshold: -3, weight: 3,
+         explanation: "The 10Y rose less than the 2Y, the defining feature of bear flattening."}
+      - {name: "Front-end outpaced long-end by >3 bps", metric: "curve.front_vs_long_1d", op: ">", threshold: 3, weight: 3,
+         explanation: "Front rising faster than the long-end is the core of the regime."}
+      - {name: "Overall curve shifted higher", metric: "curve.shift_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "A bearish (higher-rates) backdrop is consistent with the move."}
+      - {name: "1Y yield rose", metric: "1Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Money-market-sensitive points rising reinforces near-term policy repricing."}
+      - {name: "2Y move statistically significant (z > 1.0)", metric: "2Y.z_1d", op: ">", threshold: 1.0, weight: 2,
+         explanation: "A large z-score shows the front-end move is unusual, not noise."}
+    contradictions:
+      - {name: "2Y yield fell", metric: "2Y.chg_1d", op: "<", threshold: 0, weight: 3,
+         explanation: "A falling front-end is the opposite of bear flattening."}
+      - {name: "Long-end rose much more than front-end", metric: "curve.front_vs_long_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "If the long-end leads, the move is steepening, not flattening."}
+      - {name: "2s10s spread steepened strongly", metric: "spread.2s10s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Steepening directly contradicts a flattening regime."}
+      - {name: "Whole curve rallied lower", metric: "curve.shift_1d", op: "<", threshold: -2, weight: 2,
+         explanation: "A broad rally is inconsistent with a bearish move."}
+
+  # -------------------------------------------------------------------------
+  - id: bear_steepening
+    name: "Bear Steepening / Term Premium Shock"
+    category: bear
+    definition: >
+      The curve steepens because long-term yields rise more than short-term
+      yields. Often driven by rising term premium, debt-supply fears, a
+      long-run inflation scare, or a duration sell-off.
+    interpretation: >
+      Long-end yields rose more than front-end yields, suggesting term premium
+      pressure or inflation / fiscal concerns.
+    confirming:
+      - {name: "10Y yield rose more than +5 bps", metric: "10Y.chg_1d", op: ">", threshold: 5, weight: 2,
+         explanation: "The 10Y leading higher is the engine of a bear steepening."}
+      - {name: "30Y yield rose more than +5 bps", metric: "30Y.chg_1d", op: ">", threshold: 5, weight: 2,
+         explanation: "The long bond selling off points to duration / term-premium pressure."}
+      - {name: "30Y rose more than 2Y by >3 bps", metric: "spread.2s30s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "The 2s30s steepening confirms the long-end is leading."}
+      - {name: "2s10s spread steepened (> +3 bps)", metric: "spread.2s10s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "A steeper 2s10s is the defining feature of the regime."}
+      - {name: "5s30s spread steepened (> +3 bps)", metric: "spread.5s30s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Steepening at the very long end is classic term-premium behaviour."}
+      - {name: "Long-end outpaced front-end by >3 bps", metric: "curve.long_vs_front_1d", op: ">", threshold: 3, weight: 3,
+         explanation: "Long > front is the core asymmetry of bear steepening."}
+      - {name: "Overall curve shifted higher", metric: "curve.shift_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "A bearish backdrop is consistent with the move."}
+      - {name: "10Y move significant (z > 1.0)", metric: "10Y.z_1d", op: ">", threshold: 1.0, weight: 1,
+         explanation: "A large z-score shows the long-end move is unusual."}
+      - {name: "30Y move significant (z > 1.0)", metric: "30Y.z_1d", op: ">", threshold: 1.0, weight: 1,
+         explanation: "Confirms the long bond move is meaningful."}
+    contradictions:
+      - {name: "10Y yield fell", metric: "10Y.chg_1d", op: "<", threshold: 0, weight: 2,
+         explanation: "A long-end rally contradicts a bearish steepening."}
+      - {name: "30Y yield fell", metric: "30Y.chg_1d", op: "<", threshold: 0, weight: 2,
+         explanation: "The long bond rallying is inconsistent with the regime."}
+      - {name: "2Y rose more than 30Y", metric: "spread.2s30s.chg_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "If the front-end leads, the move is flattening, not steepening."}
+      - {name: "5s30s flattened", metric: "spread.5s30s.chg_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "Long-end flattening contradicts term-premium steepening."}
+      - {name: "Whole curve rallied lower", metric: "curve.shift_1d", op: "<", threshold: -2, weight: 2,
+         explanation: "A broad rally is inconsistent with a bearish move."}
+
+  # -------------------------------------------------------------------------
+  - id: bull_steepening
+    name: "Bull Steepening / Recession Pricing"
+    category: bull
+    definition: >
+      The curve steepens because short-term yields fall more than long-term
+      yields. Typically the market is pricing future rate cuts or an economic
+      slowdown.
+    interpretation: >
+      Front-end yields fell more than long-end yields, suggesting the market is
+      pricing future Fed cuts or recession risk.
+    confirming:
+      - {name: "2Y yield fell more than -5 bps", metric: "2Y.chg_1d", op: "<", threshold: -5, weight: 2,
+         explanation: "A sharp front-end rally is how the market prices easier policy."}
+      - {name: "5Y yield fell more than -4 bps", metric: "5Y.chg_1d", op: "<", threshold: -4, weight: 2,
+         explanation: "The belly rallying with the front-end supports the dovish read."}
+      - {name: "10Y yield did not rise", metric: "10Y.chg_1d", op: "<=", threshold: 0, weight: 1,
+         explanation: "The long-end holding or falling less keeps the move a steepening."}
+      - {name: "2s10s spread steepened (> +3 bps)", metric: "spread.2s10s.chg_1d", op: ">", threshold: 3, weight: 3,
+         explanation: "A steeper 2s10s driven by the front-end is the defining feature."}
+      - {name: "Front-end fell more than long-end by >3 bps", metric: "curve.front_vs_long_1d", op: "<", threshold: -3, weight: 3,
+         explanation: "Front falling faster than the long-end is the core asymmetry."}
+      - {name: "Overall curve rallied lower", metric: "curve.shift_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "A lower-rates backdrop is consistent with easing expectations."}
+      - {name: "2Y move significant (z < -1.0)", metric: "2Y.z_1d", op: "<", threshold: -1.0, weight: 2,
+         explanation: "A large negative z-score shows the front-end rally is unusual."}
+    contradictions:
+      - {name: "2Y yield rose", metric: "2Y.chg_1d", op: ">", threshold: 0, weight: 3,
+         explanation: "A rising front-end contradicts a bullish steepening."}
+      - {name: "2s10s spread flattened", metric: "spread.2s10s.chg_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "Flattening is the opposite of this regime."}
+      - {name: "Whole curve sold off", metric: "curve.shift_1d", op: ">", threshold: 2, weight: 2,
+         explanation: "A broad sell-off is inconsistent with a bullish move."}
+      - {name: "Front-end rose more than long-end", metric: "curve.front_vs_long_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Front leading higher would be bear flattening, not bull steepening."}
+
+  # -------------------------------------------------------------------------
+  - id: bull_flattening
+    name: "Bull Flattening / Long-End Rally"
+    category: bull
+    definition: >
+      The curve flattens because long-term yields fall more than short-term
+      yields. Can signal strong duration demand, lower long-run growth /
+      inflation expectations, or a flight-to-quality bid.
+    interpretation: >
+      Long-end yields fell more than front-end yields, suggesting duration
+      demand or lower long-term growth / inflation expectations.
+    confirming:
+      - {name: "10Y yield fell more than -5 bps", metric: "10Y.chg_1d", op: "<", threshold: -5, weight: 2,
+         explanation: "A strong 10Y rally is the engine of bull flattening."}
+      - {name: "30Y yield fell more than -5 bps", metric: "30Y.chg_1d", op: "<", threshold: -5, weight: 2,
+         explanation: "The long bond rallying points to duration demand."}
+      - {name: "2s10s spread flattened (< -3 bps)", metric: "spread.2s10s.chg_1d", op: "<", threshold: -3, weight: 3,
+         explanation: "A flatter 2s10s driven by the long-end is the defining feature."}
+      - {name: "5s30s spread flattened (< -3 bps)", metric: "spread.5s30s.chg_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "Flattening at the very long end confirms long-end leadership."}
+      - {name: "Long-end fell more than front-end by >3 bps", metric: "curve.long_vs_front_1d", op: "<", threshold: -3, weight: 3,
+         explanation: "Long falling faster than the front-end is the core asymmetry."}
+      - {name: "Overall curve rallied lower", metric: "curve.shift_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "A lower-rates backdrop is consistent with the move."}
+      - {name: "10Y move significant (z < -1.0)", metric: "10Y.z_1d", op: "<", threshold: -1.0, weight: 1,
+         explanation: "A large negative z-score shows the long-end rally is unusual."}
+      - {name: "30Y move significant (z < -1.0)", metric: "30Y.z_1d", op: "<", threshold: -1.0, weight: 1,
+         explanation: "Confirms the long bond rally is meaningful."}
+    contradictions:
+      - {name: "10Y yield rose", metric: "10Y.chg_1d", op: ">", threshold: 0, weight: 2,
+         explanation: "A rising long-end contradicts a bullish flattening."}
+      - {name: "2s10s spread steepened", metric: "spread.2s10s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Steepening is the opposite of this regime."}
+      - {name: "Whole curve sold off", metric: "curve.shift_1d", op: ">", threshold: 2, weight: 2,
+         explanation: "A broad sell-off is inconsistent with a bullish move."}
+      - {name: "Front-end fell more than long-end", metric: "curve.front_vs_long_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "Front leading lower would be bull steepening, not bull flattening."}
+
+  # -------------------------------------------------------------------------
+  - id: parallel_bear
+    name: "Parallel Bear Shift / Broad Rates Selloff"
+    category: bear
+    definition: >
+      The entire curve moves higher in a roughly parallel fashion, indicating
+      broad upward pressure on rates rather than a slope story.
+    interpretation: >
+      The entire curve sold off in a broadly parallel move.
+    confirming:
+      - {name: "Average curve shift > +4 bps", metric: "curve.shift_1d", op: ">", threshold: 4, weight: 3,
+         explanation: "A sizeable broad rise is the headline of a parallel bear shift."}
+      - {name: "2Y rose", metric: "2Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "The front-end participating keeps the move broad."}
+      - {name: "5Y rose", metric: "5Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Belly participation supports a parallel move."}
+      - {name: "10Y rose", metric: "10Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "The long-end participating keeps the move broad."}
+      - {name: "30Y rose", metric: "30Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Long-bond participation supports a parallel move."}
+      - {name: "Front vs long gap small (|.| < 3 bps)", metric: "curve.front_vs_long_1d", op: "abs<", threshold: 3, weight: 3,
+         explanation: "A small front-vs-long gap is what makes the shift parallel."}
+      - {name: "2s10s barely moved (|.| < 3 bps)", metric: "spread.2s10s.chg_1d", op: "abs<", threshold: 3, weight: 2,
+         explanation: "Little slope change confirms a level (not slope) move."}
+      - {name: "5s30s barely moved (|.| < 3 bps)", metric: "spread.5s30s.chg_1d", op: "abs<", threshold: 3, weight: 2,
+         explanation: "A stable long-end slope reinforces parallelism."}
+    contradictions:
+      - {name: "Front and long diverged strongly (|.| > 6 bps)", metric: "curve.front_vs_long_1d", op: "abs>", threshold: 6, weight: 2,
+         explanation: "A large slope move means the shift was not parallel."}
+      - {name: "Average curve shift was negative", metric: "curve.shift_1d", op: "<", threshold: 0, weight: 3,
+         explanation: "A falling curve contradicts a bearish shift."}
+
+  # -------------------------------------------------------------------------
+  - id: parallel_bull
+    name: "Parallel Bull Shift / Broad Duration Rally"
+    category: bull
+    definition: >
+      The entire curve moves lower in a roughly parallel fashion, indicating
+      broad demand for duration or a broad fall in rate expectations.
+    interpretation: >
+      The whole curve rallied lower in a broad duration rally.
+    confirming:
+      - {name: "Average curve shift < -4 bps", metric: "curve.shift_1d", op: "<", threshold: -4, weight: 3,
+         explanation: "A sizeable broad fall is the headline of a parallel bull shift."}
+      - {name: "2Y fell", metric: "2Y.chg_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "The front-end participating keeps the move broad."}
+      - {name: "5Y fell", metric: "5Y.chg_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "Belly participation supports a parallel move."}
+      - {name: "10Y fell", metric: "10Y.chg_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "The long-end participating keeps the move broad."}
+      - {name: "30Y fell", metric: "30Y.chg_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "Long-bond participation supports a parallel move."}
+      - {name: "Front vs long gap small (|.| < 3 bps)", metric: "curve.front_vs_long_1d", op: "abs<", threshold: 3, weight: 3,
+         explanation: "A small front-vs-long gap is what makes the shift parallel."}
+      - {name: "2s10s barely moved (|.| < 3 bps)", metric: "spread.2s10s.chg_1d", op: "abs<", threshold: 3, weight: 2,
+         explanation: "Little slope change confirms a level (not slope) move."}
+      - {name: "5s30s barely moved (|.| < 3 bps)", metric: "spread.5s30s.chg_1d", op: "abs<", threshold: 3, weight: 2,
+         explanation: "A stable long-end slope reinforces parallelism."}
+    contradictions:
+      - {name: "Front and long diverged strongly (|.| > 6 bps)", metric: "curve.front_vs_long_1d", op: "abs>", threshold: 6, weight: 2,
+         explanation: "A large slope move means the shift was not parallel."}
+      - {name: "Average curve shift was positive", metric: "curve.shift_1d", op: ">", threshold: 0, weight: 3,
+         explanation: "A rising curve contradicts a bullish shift."}
+
+  # -------------------------------------------------------------------------
+  - id: rates_shock
+    name: "Rates Shock / Higher-for-Longer"
+    category: shock
+    definition: >
+      Rates jump sharply, especially in policy-sensitive maturities, consistent
+      with the market pricing a more restrictive or more durably restrictive
+      monetary policy.
+    interpretation: >
+      Rates moved sharply higher, especially in the policy-sensitive part of the
+      curve, suggesting a higher-for-longer repricing.
+    confirming:
+      - {name: "2Y yield rose more than +7 bps", metric: "2Y.chg_1d", op: ">", threshold: 7, weight: 3,
+         explanation: "A large front-end jump is the signature of a rates shock."}
+      - {name: "5Y yield rose more than +7 bps", metric: "5Y.chg_1d", op: ">", threshold: 7, weight: 2,
+         explanation: "A sharp belly move shows the shock spans policy-sensitive tenors."}
+      - {name: "10Y yield rose more than +5 bps", metric: "10Y.chg_1d", op: ">", threshold: 5, weight: 2,
+         explanation: "The 10Y joining confirms broad upward pressure."}
+      - {name: "Average curve shift > +5 bps", metric: "curve.shift_1d", op: ">", threshold: 5, weight: 2,
+         explanation: "A strong broad rise distinguishes a shock from a normal day."}
+      - {name: "2Y move very significant (z > 1.5)", metric: "2Y.z_1d", op: ">", threshold: 1.5, weight: 2,
+         explanation: "A high z-score marks a genuinely unusual repricing."}
+      - {name: "5Y move very significant (z > 1.5)", metric: "5Y.z_1d", op: ">", threshold: 1.5, weight: 1,
+         explanation: "Confirms the belly move is extreme."}
+      - {name: "2s10s flattened or held", metric: "spread.2s10s.chg_1d", op: "<=", threshold: 0, weight: 1,
+         explanation: "Front-led shocks tend to flatten or hold an inverted curve."}
+      - {name: "Front-end average > +5 bps", metric: "seg.front.chg_1d", op: ">", threshold: 5, weight: 2,
+         explanation: "A strong front segment confirms policy-driven pressure."}
+    contradictions:
+      - {name: "2Y yield fell", metric: "2Y.chg_1d", op: "<", threshold: 0, weight: 3,
+         explanation: "A falling front-end is the opposite of a hawkish shock."}
+      - {name: "5Y yield fell", metric: "5Y.chg_1d", op: "<", threshold: 0, weight: 2,
+         explanation: "A belly rally contradicts the regime."}
+      - {name: "Average curve shift negative", metric: "curve.shift_1d", op: "<", threshold: 0, weight: 3,
+         explanation: "A falling curve is inconsistent with a rates shock."}
+
+  # -------------------------------------------------------------------------
+  - id: recession_scare
+    name: "Recession Scare / Policy Easing Pricing"
+    category: bull
+    definition: >
+      The market prices a slowdown or future rate cuts. Short and intermediate
+      yields fall sharply, usually with a steepening curve.
+    interpretation: >
+      Front-end and belly yields fell sharply, suggesting the market is pricing
+      easier future policy or recession risk.
+    confirming:
+      - {name: "2Y yield fell more than -7 bps", metric: "2Y.chg_1d", op: "<", threshold: -7, weight: 3,
+         explanation: "A large front-end rally is how a growth scare is priced."}
+      - {name: "5Y yield fell more than -6 bps", metric: "5Y.chg_1d", op: "<", threshold: -6, weight: 2,
+         explanation: "The belly leading lower reinforces the easing read."}
+      - {name: "10Y yield fell", metric: "10Y.chg_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "The long-end joining the rally supports risk-off pricing."}
+      - {name: "Average curve shift < -4 bps", metric: "curve.shift_1d", op: "<", threshold: -4, weight: 2,
+         explanation: "A strong broad rally distinguishes a scare from a quiet day."}
+      - {name: "2s10s steepened", metric: "spread.2s10s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Bull steepening is the typical shape of easing expectations."}
+      - {name: "Front-end fell more than long-end", metric: "curve.front_vs_long_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "Front leadership confirms the cut-pricing dynamic."}
+      - {name: "2Y move very significant (z < -1.5)", metric: "2Y.z_1d", op: "<", threshold: -1.5, weight: 2,
+         explanation: "A high negative z-score marks a genuinely unusual rally."}
+    contradictions:
+      - {name: "2Y yield rose", metric: "2Y.chg_1d", op: ">", threshold: 0, weight: 3,
+         explanation: "A rising front-end contradicts easing expectations."}
+      - {name: "5Y yield rose", metric: "5Y.chg_1d", op: ">", threshold: 0, weight: 2,
+         explanation: "A belly sell-off contradicts the regime."}
+      - {name: "Average curve shift positive", metric: "curve.shift_1d", op: ">", threshold: 2, weight: 2,
+         explanation: "A rising curve is inconsistent with a recession scare."}
+
+  # -------------------------------------------------------------------------
+  - id: inflation_repricing
+    name: "Inflation Repricing"
+    category: inflation
+    definition: >
+      The move looks driven by a revision in inflation expectations. Nominal
+      yields rise and, where available, breakeven inflation rises with them.
+    interpretation: >
+      Nominal yields rose alongside inflation compensation, suggesting inflation
+      repricing rather than pure real-rate pressure.
+    confirming:
+      - {name: "10Y nominal yield rose", metric: "10Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Higher nominal long yields are a precondition for the regime."}
+      - {name: "30Y nominal yield rose", metric: "30Y.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Long-end participation supports an inflation story."}
+      - {name: "10Y breakeven inflation rose", metric: "be.10y.chg_1d", op: ">", threshold: 0, weight: 3,
+         explanation: "Rising 10Y breakevens are the cleanest sign of inflation repricing."}
+      - {name: "5Y breakeven inflation rose", metric: "be.5y.chg_1d", op: ">", threshold: 0, weight: 2,
+         explanation: "Front breakevens rising confirm a near-term inflation impulse."}
+      - {name: "Long-end average rose", metric: "seg.long.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "The long segment moving up is consistent with inflation risk."}
+      - {name: "5s30s steepened", metric: "spread.5s30s.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Long-end steepening often accompanies an inflation scare."}
+      - {name: "Overall curve shifted higher", metric: "curve.shift_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "A higher-rates backdrop is consistent with the move."}
+    contradictions:
+      - {name: "10Y breakeven fell", metric: "be.10y.chg_1d", op: "<", threshold: 0, weight: 3,
+         explanation: "Falling breakevens mean the move is real-rate, not inflation, driven."}
+      - {name: "10Y nominal yield fell", metric: "10Y.chg_1d", op: "<", threshold: 0, weight: 2,
+         explanation: "Falling nominal yields contradict an inflation sell-off."}
+      - {name: "5Y breakeven fell", metric: "be.5y.chg_1d", op: "<", threshold: 0, weight: 1,
+         explanation: "Falling front breakevens weaken the inflation read."}
+
+  # -------------------------------------------------------------------------
+  - id: term_premium_shock
+    name: "Term Premium Shock"
+    category: inflation
+    definition: >
+      The long-end rises disproportionately, often without a matching front-end
+      move. Can signal higher term premium, fiscal uncertainty, or greater
+      demand for compensation to hold long duration.
+    interpretation: >
+      The long end sold off disproportionately, consistent with a term premium
+      or duration risk shock.
+    confirming:
+      - {name: "30Y rose more than 2Y by >5 bps", metric: "spread.2s30s.chg_1d", op: ">", threshold: 5, weight: 3,
+         explanation: "A large 2s30s steepening is the signature of a term-premium shock."}
+      - {name: "10Y rose more than 2Y by >3 bps", metric: "spread.2s10s.chg_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Steepening from the long-end up confirms duration pressure."}
+      - {name: "5s30s steepened", metric: "spread.5s30s.chg_1d", op: ">", threshold: 0, weight: 2,
+         explanation: "Steepening at the very long end is characteristic."}
+      - {name: "10s30s steepened", metric: "spread.10s30s.chg_1d", op: ">", threshold: 0, weight: 2,
+         explanation: "The 30Y leading the 10Y points to specific long-bond pressure."}
+      - {name: "Long-end outpaced front-end by >4 bps", metric: "curve.long_vs_front_1d", op: ">", threshold: 4, weight: 3,
+         explanation: "Strong long-over-front asymmetry is the core of the regime."}
+      - {name: "30Y move significant (z > 1.0)", metric: "30Y.z_1d", op: ">", threshold: 1.0, weight: 1,
+         explanation: "A high z-score shows the long-bond move is unusual."}
+      - {name: "Overall curve shifted higher", metric: "curve.shift_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "A bearish backdrop is consistent with the move."}
+    contradictions:
+      - {name: "Front-end rose more than long-end", metric: "curve.front_vs_long_1d", op: ">", threshold: 3, weight: 2,
+         explanation: "Front leadership would be Fed repricing, not a term-premium shock."}
+      - {name: "30Y yield fell", metric: "30Y.chg_1d", op: "<", threshold: 0, weight: 2,
+         explanation: "A long-bond rally contradicts the regime."}
+      - {name: "5s30s flattened", metric: "spread.5s30s.chg_1d", op: "<", threshold: -3, weight: 2,
+         explanation: "Long-end flattening is inconsistent with term-premium pressure."}
+
+  # -------------------------------------------------------------------------
+  - id: deep_inversion
+    name: "Deep Inversion / Late Cycle"
+    category: shock
+    definition: >
+      The curve is strongly inverted, with short rates well above long rates,
+      a classic late-cycle signature of tight monetary policy.
+    interpretation: >
+      The curve remains deeply inverted, consistent with late-cycle monetary
+      tightness.
+    confirming:
+      - {name: "2s10s is inverted (< 0)", metric: "spread.2s10s.level", op: "<", threshold: 0, weight: 2,
+         explanation: "A negative 2s10s is the baseline definition of inversion."}
+      - {name: "2s10s deeply inverted (< -50 bps)", metric: "spread.2s10s.level", op: "<", threshold: -50, weight: 2,
+         explanation: "A large negative 2s10s marks a genuinely deep inversion."}
+      - {name: "3m10y is inverted (< 0)", metric: "spread.3m10y.level", op: "<", threshold: 0, weight: 2,
+         explanation: "The 3m10y is the Fed's preferred recession gauge."}
+      - {name: "3m10y deeply inverted (< -75 bps)", metric: "spread.3m10y.level", op: "<", threshold: -75, weight: 2,
+         explanation: "A deeply negative 3m10y is a strong late-cycle signal."}
+      - {name: "2s30s inverted (< 0)", metric: "spread.2s30s.level", op: "<", threshold: 0, weight: 1,
+         explanation: "Even the long end below the front-end shows broad inversion."}
+      - {name: "Inversion persisted over recent days", metric: "spread.2s10s.recently_inverted", op: ">", threshold: 0.5, weight: 1,
+         explanation: "A persistent, not one-day, inversion is what matters for the cycle."}
+    contradictions:
+      - {name: "2s10s is positive", metric: "spread.2s10s.level", op: ">", threshold: 0, weight: 2,
+         explanation: "A positive 2s10s means the curve is not inverted."}
+      - {name: "3m10y is positive", metric: "spread.3m10y.level", op: ">", threshold: 0, weight: 2,
+         explanation: "A positive 3m10y contradicts inversion."}
+      - {name: "2s10s steepening fast (> +10 bps)", metric: "spread.2s10s.chg_1d", op: ">", threshold: 10, weight: 1,
+         explanation: "A rapid disinversion suggests the regime is ending."}
+
+  # -------------------------------------------------------------------------
+  - id: disinversion
+    name: "Disinversion / Normalization"
+    category: neutral_color
+    definition: >
+      The curve becomes less inverted, via a falling front-end, a rising
+      long-end, or both, moving back towards a normal upward slope.
+    interpretation: >
+      The curve is disinverting, meaning the inversion is becoming less severe.
+    confirming:
+      - {name: "2s10s steeper over 5 days", metric: "spread.2s10s.chg_5d", op: ">", threshold: 0, weight: 2,
+         explanation: "A multi-day steepening trend is the essence of disinversion."}
+      - {name: "2s10s steeper over 20 days", metric: "spread.2s10s.chg_20d", op: ">", threshold: 0, weight: 2,
+         explanation: "A 20-day steepening confirms a normalisation trend."}
+      - {name: "3m10y steeper over 20 days", metric: "spread.3m10y.chg_20d", op: ">", threshold: 0, weight: 2,
+         explanation: "The 3m10y normalising supports the disinversion read."}
+      - {name: "Curve was inverted recently", metric: "spread.2s10s.recently_inverted", op: ">", threshold: 0.5, weight: 2,
+         explanation: "Disinversion only matters if the curve was inverted to begin with."}
+      - {name: "2s10s steepened today", metric: "spread.2s10s.chg_1d", op: ">", threshold: 0, weight: 1,
+         explanation: "Today's steepening adds to the normalisation."}
+    contradictions:
+      - {name: "2s10s flatter over 5 days", metric: "spread.2s10s.chg_5d", op: "<", threshold: 0, weight: 2,
+         explanation: "Re-flattening contradicts disinversion."}
+      - {name: "3m10y flatter over 5 days", metric: "spread.3m10y.chg_5d", op: "<", threshold: 0, weight: 2,
+         explanation: "A re-inverting 3m10y is inconsistent with normalisation."}
+      - {name: "2s10s sharply flatter over 20 days (< -10 bps)", metric: "spread.2s10s.chg_20d", op: "<", threshold: -10, weight: 1,
+         explanation: "A worsening inversion is the opposite of the regime."}
+
+  # -------------------------------------------------------------------------
+  - id: front_end_anchored
+    name: "Front-End Anchored / Long-End Moving"
+    category: inflation
+    definition: >
+      The front-end is stable while the long-end moves materially. Near-term
+      policy expectations are steady, but growth, inflation, or term-premium
+      views are changing.
+    interpretation: >
+      The front-end stayed anchored while the long-end moved, suggesting the
+      move is less about near-term Fed policy and more about long-term macro
+      pricing.
+    confirming:
+      - {name: "2Y barely moved (|.| < 2 bps)", metric: "2Y.chg_1d", op: "abs<", threshold: 2, weight: 2,
+         explanation: "A still 2Y is the defining feature of an anchored front-end."}
+      - {name: "1Y barely moved (|.| < 2 bps)", metric: "1Y.chg_1d", op: "abs<", threshold: 2, weight: 1,
+         explanation: "A stable 1Y reinforces that near-term policy views are steady."}
+      - {name: "10Y moved materially (|.| > 5 bps)", metric: "10Y.chg_1d", op: "abs>", threshold: 5, weight: 2,
+         explanation: "A meaningful 10Y move is what makes the regime interesting."}
+      - {name: "30Y moved materially (|.| > 5 bps)", metric: "30Y.chg_1d", op: "abs>", threshold: 5, weight: 2,
+         explanation: "Long-bond movement confirms the action is at the long-end."}
+      - {name: "Long-end moved more than front-end by >4 bps", metric: "curve.long_vs_front_abs_1d", op: ">", threshold: 4, weight: 3,
+         explanation: "The size asymmetry between long and front is the core signal."}
+      - {name: "5s30s changed materially (|.| > 5 bps)", metric: "spread.5s30s.chg_1d", op: "abs>", threshold: 5, weight: 1,
+         explanation: "A moving long-end slope shows the long sector is repricing."}
+    contradictions:
+      - {name: "2Y moved strongly (|.| > 5 bps)", metric: "2Y.chg_1d", op: "abs>", threshold: 5, weight: 2,
+         explanation: "A large front-end move means it is not anchored."}
+      - {name: "Front-end moved as much as long-end", metric: "curve.long_vs_front_abs_1d", op: "<", threshold: 0, weight: 2,
+         explanation: "If the front moves as much as the long-end, the regime fails."}
+
+  # -------------------------------------------------------------------------
+  - id: neutral_mixed
+    name: "Neutral / Mixed"
+    category: neutral
+    definition: >
+      No curve regime clearly dominates. Either the signals contradict each
+      other, the moves are too small to be meaningful, or too much data is
+      missing to be confident.
+    interpretation: >
+      Signals are mixed or muted; no single regime dominates the move.
+    confirming: []
+    contradictions: []
