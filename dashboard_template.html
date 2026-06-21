@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macro Regime Dashboard</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#131a26; --panel-2:#0f1521; --raised:#1a2230;
+    --line:#222b3a; --line-soft:#1b2330;
+    --text:#e7eaf1; --muted:#8a93a6; --muted-2:#6b7488;
+    --pos:#34d399; --neg:#f87171; --zero:#8a93a6;
+    --accent:#6b7280;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --radius:14px; --radius-sm:9px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(80,110,170,.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, rgba(40,160,140,.07), transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans);
+    font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1140px; margin:0 auto; padding:34px 20px 80px}
+  a{color:#7aa2f7}
+
+  /* ---- header ---- */
+  header.top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px}
+  .brand{display:flex; flex-direction:column; gap:6px}
+  .brand .kicker{font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--muted)}
+  .brand h1{margin:0; font-size:26px; font-weight:680; letter-spacing:-.01em}
+  .brand .tag{color:var(--muted); font-size:13.5px; max-width:56ch}
+  .meta{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end}
+  .pill{font-family:var(--mono); font-size:11.5px; color:var(--text); background:var(--panel);
+    border:1px solid var(--line); border-radius:999px; padding:6px 11px; display:inline-flex; gap:6px; align-items:center}
+  .pill b{color:var(--muted-2); font-weight:600}
+
+  section{margin-top:26px}
+  .sec-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 2px 12px}
+  .sec-head h3{margin:0; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:640}
+  .sec-head .hint{font-size:12px; color:var(--muted-2)}
+
+  /* ---- primary banner ---- */
+  .primary{position:relative; overflow:hidden; border:1px solid var(--line);
+    border-radius:var(--radius); padding:22px 22px 20px; background:
+      linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--panel)), var(--panel));
+  }
+  .primary::before{content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--accent)}
+  .primary-eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:color-mix(in srgb, var(--accent) 55%, var(--muted))}
+  .primary-name{margin:6px 0 14px; font-size:30px; font-weight:720; letter-spacing:-.02em}
+  .conf{display:flex; align-items:center; gap:14px}
+  .conf-track{flex:1; height:12px; background:var(--panel-2); border:1px solid var(--line); border-radius:999px; overflow:hidden}
+  .conf-fill{height:100%; background:linear-gradient(90deg, color-mix(in srgb,var(--accent) 70%, #fff 0%), var(--accent)); border-radius:999px; transition:width .6s ease}
+  .conf-val{font-family:var(--mono); font-size:22px; font-weight:680; min-width:64px; text-align:right}
+  .conf-val .pct{font-size:13px; color:var(--muted); margin-left:1px}
+  .primary-note{margin-top:10px; color:var(--muted); font-size:13.5px}
+
+  /* ---- regime cards ---- */
+  .cards{display:flex; flex-direction:column; gap:10px}
+  .card{border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--panel); overflow:hidden}
+  .card-head{width:100%; cursor:pointer; display:grid; grid-template-columns:14px 1fr auto auto 18px; align-items:center; gap:12px;
+    padding:13px 15px; background:transparent; border:0; color:inherit; text-align:left; font-family:inherit; font-size:15px}
+  .card-head:hover{background:var(--raised)}
+  .card-head:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  .swatch{width:12px; height:12px; border-radius:3px; background:var(--accent)}
+  .card-name{font-weight:620}
+  .card-meta{font-family:var(--mono); font-size:11.5px; color:var(--muted-2); white-space:nowrap}
+  .card-score{font-family:var(--mono); font-weight:680; font-size:18px; min-width:54px; text-align:right; color:color-mix(in srgb, var(--accent) 60%, var(--text))}
+  .card-score .pct{font-size:11px; color:var(--muted); margin-left:1px}
+  .chev{color:var(--muted-2); transition:transform .2s ease; text-align:center; font-size:18px}
+  .card.open .chev{transform:rotate(90deg)}
+  .bar{height:4px; background:var(--panel-2)}
+  .bar-fill{height:100%; background:var(--accent); transition:width .6s ease}
+
+  .detail{display:none; padding:14px 16px 18px; border-top:1px solid var(--line-soft); background:var(--panel-2)}
+  .card.open .detail{display:block; animation:fade .18s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .def{margin:2px 0 8px; color:var(--text); font-size:13.5px}
+  .sum{margin:0 0 14px; color:var(--muted); font-size:13px; font-family:var(--mono); line-height:1.55}
+
+  .rblock{margin-top:12px}
+  .rblock-h{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted-2); margin-bottom:7px; display:flex; align-items:center; gap:7px}
+  .rcount{font-family:var(--mono); background:var(--raised); border:1px solid var(--line); border-radius:999px; padding:1px 7px; font-size:10.5px; letter-spacing:0}
+  .rlist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+  .rule{border:1px solid var(--line-soft); border-left:3px solid var(--muted-2); border-radius:7px; padding:8px 11px; background:var(--panel)}
+  .rule-triggered{border-left-color:var(--pos)}
+  .rule-not{border-left-color:var(--muted-2)}
+  .rule-missing{border-left-color:#b88a2a}
+  .rule.kind-x.rule-triggered{border-left-color:var(--neg)}
+  .rule-top{display:flex; align-items:center; gap:8px}
+  .rule-ic{font-size:12px; line-height:1}
+  .rule-name{font-weight:600; font-size:13px; flex:1}
+  .rule-w{font-family:var(--mono); font-size:10.5px; color:var(--muted-2); border:1px solid var(--line); border-radius:5px; padding:0 5px}
+  .rule-cond{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:4px}
+  .rule-cond b{color:var(--text); font-weight:600}
+  .rule-expl{font-size:12.5px; color:var(--muted); margin-top:4px}
+
+  /* ---- tables ---- */
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--panel)}
+  table.tbl{width:100%; border-collapse:collapse; font-size:13px}
+  .tbl thead th{position:sticky; top:0; background:var(--panel-2); text-align:left; font-weight:600;
+    color:var(--muted); font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+    padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap}
+  .tbl tbody td{padding:8px 12px; border-bottom:1px solid var(--line-soft); white-space:nowrap}
+  .tbl tbody tr:last-child td{border-bottom:0}
+  .tbl tbody tr:hover{background:var(--raised)}
+  .num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums}
+  th.num{text-align:right}
+  .tk{font-family:var(--mono); color:var(--text); font-weight:600}
+  .muted{color:var(--muted-2)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .zero{color:var(--zero)}
+  .tbl.mini{font-size:12px}
+  .tbl.mini td{padding:6px 10px}
+
+  /* score diverging bars */
+  .tbl.scores td{padding:9px 12px}
+  .tbl.scores td:first-child{width:38%}
+  .sbarcell{width:46%}
+  .sbar{position:relative; height:14px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px; overflow:hidden}
+  .sline{position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line); transform:translateX(-.5px)}
+  .sfill{position:absolute; top:1px; bottom:1px; border-radius:3px; opacity:.92}
+  .sfill.pos{background:var(--pos)} .sfill.neg{background:var(--neg)}
+  .scoreval{width:16%}
+  .chip{font-family:var(--mono); font-size:11px; background:var(--raised); border:1px solid var(--line); border-radius:999px; padding:2px 8px}
+
+  /* duo layout */
+  .duo{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .panel-block{min-width:0}
+
+  /* controls */
+  .ctrl{font-family:var(--mono); font-size:11.5px; color:var(--muted); background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:6px 11px; cursor:pointer}
+  .ctrl:hover{background:var(--raised); color:var(--text)}
+  .ctrl:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+  footer{margin-top:40px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted-2); font-size:12px}
+  footer .disclaimer{max-width:88ch}
+
+  @media (max-width:760px){
+    .wrap{padding:22px 14px 64px}
+    .duo{grid-template-columns:1fr}
+    .brand h1{font-size:22px}
+    .primary-name{font-size:24px}
+    .meta{justify-content:flex-start}
+    .card-head{grid-template-columns:12px 1fr auto 16px; gap:9px}
+    .card-meta{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="kicker">Cross-Asset Regime Radar</div>
+      <h1>Macro Regime Dashboard</h1>
+      <div class="tag">Daily, rule-based read of the market regime from prior-session closes across equities, rates, FX, credit, commodities and volatility.</div>
+    </div>
+    <div class="meta">
+      <span class="pill"><b>DATA</b> {{DATA_DATE}}</span>
+      <span class="pill"><b>RUN</b> {{ANALYSIS_DATE}}</span>
+      <span class="pill"><b>SOURCE</b> {{SOURCE}}</span>
+      <span class="pill"><b>REGIMES</b> {{N_REGIMES}}</span>
+      <span class="pill"><b>SERIES</b> {{N_SERIES}}</span>
+    </div>
+  </header>
+
+  {{PRIMARY_BLOCK}}
+
+  <section>
+    <div class="sec-head">
+      <h3>All regimes &mdash; match score</h3>
+      <button id="toggle-all" class="ctrl" type="button" onclick="toggleAll()">Expand all</button>
+    </div>
+    <div class="cards">
+      {{REGIME_CARDS}}
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h3>Aggregate macro scores</h3>
+      <span class="hint">range &minus;100 &hellip; +100 (signed z-scores)</span>
+    </div>
+    {{SCORES_TABLE}}
+  </section>
+
+  <section>
+    <div class="duo">
+      <div class="panel-block">
+        <div class="sec-head"><h3>Market moves</h3><span class="hint">% change</span></div>
+        {{MARKET_TABLE}}
+      </div>
+      <div class="panel-block">
+        <div class="sec-head"><h3>Rates &amp; yields</h3><span class="hint">level &amp; bps</span></div>
+        {{YIELDS_TABLE}}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h3>Regime history</h3><span class="hint">most recent first</span></div>
+    {{HISTORY_TABLE}}
+  </section>
+
+  <footer>
+    <div class="disclaimer">
+      <b>Educational tool, not investment advice.</b> Scores are deterministic rule-match / confidence
+      measures, not statistical probabilities or forecasts. Data is delayed end-of-day data from public
+      sources and may contain errors or gaps. Nothing here is a recommendation to buy or sell any
+      instrument. Generated automatically &mdash; run {{ANALYSIS_DATE}}, data as of {{DATA_DATE}}.
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  function toggleCard(btn){
+    var card = btn.parentNode;
+    var isOpen = card.className.indexOf("open") !== -1;
+    card.className = isOpen ? card.className.replace(/\s*open/,"") : card.className + " open";
+    btn.setAttribute("aria-expanded", isOpen ? "false" : "true");
+  }
+  function toggleAll(){
+    var cards = document.querySelectorAll(".card");
+    var anyClosed = document.querySelector(".card:not(.open)") !== null;
+    for (var i=0; i<cards.length; i++){
+      var c = cards[i];
+      var open = c.className.indexOf("open") !== -1;
+      if (anyClosed && !open){ c.className += " open"; }
+      else if (!anyClosed && open){ c.className = c.className.replace(/\s*open/,""); }
+      var b = c.querySelector(".card-head");
+      if (b){ b.setAttribute("aria-expanded", anyClosed ? "true" : "false"); }
+    }
+    var t = document.getElementById("toggle-all");
+    if (t){ t.textContent = anyClosed ? "Collapse all" : "Expand all"; }
+  }
+</script>
+</body>
+</html>
